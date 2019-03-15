@@ -1,5 +1,6 @@
 import argparse
 import itertools
+from lxml.etree import tostring
 import logging
 import os
 import sqlite3
@@ -38,19 +39,29 @@ load_parser.add_argument('de', type=str)
 load_parser.add_argument('--limit', '-n', type=int, help='Only insert this many values')
 
 
-filename = os.path.join(os.environ['HOME'], '.parcorp/data.sql')
+load_parser = parsers.add_parser('loadtmx', help='Create database from tmx file')
+load_parser.add_argument('file', type=str)
+
+
+data_dir = os.path.join(os.environ['HOME'], '.parcorp')
+filename = os.path.join(data_dir, 'data.sql')
+
+
 
 def main():
     args = PARSER.parse_args()
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
 
+    if not os.path.isdir(data_dir):
+    	os.mkdir(data_dir)
+
     if args.command == 'load':
         with open(args.en) as english_stream:
             with open(args.de) as german_stream:
                 os.unlink(filename)
                 connection = sqlite3.connect(filename)
-                connection.execute('create virtual table translation using fts3(english text, german text)')
+                create_table(connection)
 
                 for index, (english, german) in enumerate(zip(english_stream, german_stream)):
                     if args.limit is not None and index > args.limit:
@@ -59,9 +70,24 @@ def main():
                     if index % 1000 == 0:
                         print index
 
-                    connection.execute('insert into translation(english, german) values (?, ?)', (english.decode('utf8'), german.decode('utf8')))
+                    sql_insert_pair(connection, english, german)
 
                 connection.commit()
+    if args.command == 'loadtmx':
+        import lxml.etree
+        with open(args.file) as stream:
+             text = stream.read()
+
+        LOGGER.debug('Opening %r', filename)
+        connection = sqlite3.connect(filename)
+        create_table(connection)
+        tree = lxml.etree.XML(text)
+        for x in tree.xpath('//tu'):
+            string1, string2 = x.xpath('tuv')
+            string1 = ' '.join(string1.xpath('*/text()')).replace('\n', ' ').encode('utf8')
+            string2 = ' '.join(string2.xpath('*/text()')) .replace('\n', ' ').encode('utf8')
+            sql_insert_pair(connection, string2, string1)
+        connection.commit()
     elif args.command == 'search':
         args.additional_terms = args.additional_terms or []
         connection = sqlite3.connect(filename)
@@ -96,3 +122,10 @@ def main():
                 print 'GERMAN', german,
                 print 'ENGLISH', english,
                 print
+
+
+def create_table(connection):
+    connection.execute('create virtual table translation using fts3(english text, german text)')
+
+def sql_insert_pair(connection, english, german):
+    connection.execute('insert into translation(english, german) values (?, ?)', (english.decode('utf8'), german.decode('utf8')))
