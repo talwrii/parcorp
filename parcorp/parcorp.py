@@ -152,7 +152,6 @@ def main():
         cursor.execute(sql, terms)
         if args.count:
             print len(cursor.fetchall())
-
         else:
             for index, (german, english) in enumerate(cursor.fetchall()):
                 if args.skip is not None and index % args.skip != 0:
@@ -160,7 +159,7 @@ def main():
                 if args.words is not None:
                     if min(len(german.split(' ')), len(english.split(' '))) < args.words:
                         continue
-                    
+
                 print 'GERMAN', german,
                 print 'ENGLISH', english,
                 print
@@ -170,4 +169,5 @@ def create_table(connection):
     connection.execute('create virtual table translation using fts3(english text, german text)')
 
 def sql_insert_pair(connection, english, german):
-    connection.execute('insert into translation(english, german) values (?, ?)', (english.decode('utf8'), german.decode('utf8')))
+    LOGGER.debug('Inserting %r, %r', english, german)
+    connection.execute('insert into translation(english, german) values (?, ?)', (english, german))
