@@ -1,10 +1,14 @@
 # parcorp
 
-A tool to explore parralel corpuses.
+A tool to explore parallel corpora from the command line.
+
+Find actual examples of usages of words when learning a language to find subtleties of meaning, grammar and usage.
 
 # Motivation
 
-A lot can be learned by looking at the same text translated into different languages. Such "rosetta stones" have when collated have a name: parallel corpuses.
+A lot can be learned by looking at the same text translated into different languages. Such "rosetta stones" have when collated have a name: parallel corpuses. These can be very good for deriving when words have subtly different meanings, and what these meanings are in a way that a dictionary cannot.
+
+This tool is designed to make it easier to search these parallel corpora and do so in a way that allows easy interaction with other tools.
 
 # Data sources
 
