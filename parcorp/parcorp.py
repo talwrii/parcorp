@@ -1,4 +1,6 @@
 import argparse
+import time
+import os
 import itertools
 from lxml.etree import tostring
 import logging
@@ -38,9 +40,9 @@ load_parser.add_argument('en', type=str)
 load_parser.add_argument('de', type=str)
 load_parser.add_argument('--limit', '-n', type=int, help='Only insert this many values')
 
-
-load_parser = parsers.add_parser('loadtmx', help='Create database from tmx file')
-load_parser.add_argument('file', type=str)
+tmx_parser = parsers.add_parser('loadtmx', help='Create database from tmx file')
+tmx_parser.add_argument('file', type=str)
+tmx_parser.add_argument('--limit', '-n', type=int, help='Only insert this many values')
 
 
 data_dir = os.path.join(os.environ['HOME'], '.parcorp')
@@ -75,18 +77,53 @@ def main():
                 connection.commit()
     if args.command == 'loadtmx':
         import lxml.etree
-        with open(args.file) as stream:
-             text = stream.read()
+        TU, VALUE1, VALUE2 = 'tu', 'tu1', 'tu2'
 
         LOGGER.debug('Opening %r', filename)
         connection = sqlite3.connect(filename)
         create_table(connection)
-        tree = lxml.etree.XML(text)
-        for x in tree.xpath('//tu'):
-            string1, string2 = x.xpath('tuv')
-            string1 = ' '.join(string1.xpath('*/text()')).replace('\n', ' ').encode('utf8')
-            string2 = ' '.join(string2.xpath('*/text()')) .replace('\n', ' ').encode('utf8')
-            sql_insert_pair(connection, string2, string1)
+
+        with open(args.file) as stream:
+            state = None
+
+            string1 = string2 = ''
+            index = 0
+            start = time.time()
+            for event, element in  lxml.etree.iterparse(stream, events=('start', 'end')):
+                if event == 'start':
+                    if element.tag == 'tu':
+                        string1 = string2 = ''
+                        state = TU
+                    elif element.tag == 'tuv':
+                        if state == TU:
+                            state = VALUE1
+                        elif state == VALUE1:
+                            state = VALUE2
+                        else:
+                            raise ValueError(state)
+
+                    continue
+                else:
+                    if element.tag == 'seg':
+                        if state == VALUE1:
+                            string1 += element.text
+                        elif state == VALUE2:
+                            string2 += element.text
+                        else:
+                            raise ValueError(state)
+                    elif element.tag == 'tu':
+                        sql_insert_pair(connection, string2, string1)
+                        index += 1
+                        if args.limit and index > args.limit:
+                            break
+                        if index % 1000 == 0:
+                            taken = time.time() - start
+                            print '\r{} items inserted in {:.1f} seconds. {:.1f} item/s'.format(index, taken, index * 1.0 / taken ),
+                    elif element.tag in ('header', 'tuv'):
+                        continue
+                    else:
+                        raise ValueError(element.tag)
+
         connection.commit()
     elif args.command == 'search':
         args.additional_terms = args.additional_terms or []
