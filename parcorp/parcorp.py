@@ -16,7 +16,10 @@ parsers = PARSER.add_subparsers(dest='command')
 
 PARSER.add_argument('--debug', action='store_true', help='Include debug output (to stderr)')
 
-search_parser = parsers.add_parser('search', help='Search the datbase')
+
+search_parser = parsers.add_parser('drop', help='Delete the database')
+
+search_parser = parsers.add_parser('search', help='Search the database')
 search_parser.add_argument('term', type=str, nargs='*', help='Search strings (SQLITE full text search)')
 search_parser.add_argument('--skip', type=int, metavar='SKIP', help='Output one out of SKIP results')
 search_parser.add_argument('--or', '-o', type=str, help='Search for any of these strings', action='append', dest='additional_terms')
@@ -125,6 +128,8 @@ def main():
                         raise ValueError(element.tag)
 
         connection.commit()
+    elif args.command == 'drop':
+        os.unlink(filename)
     elif args.command == 'search':
         args.additional_terms = args.additional_terms or []
         connection = sqlite3.connect(filename)
