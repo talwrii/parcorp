@@ -16,4 +16,11 @@ The main data sources that the author has used with this program are subtitle da
 
 For aligned subtitles: http://opus.nlpl.eu/ is a good source. Use the `loadtmx` command and tmx format.
 
+Here is a fairly complete source for learning english and german: https://object.pouta.csc.fi/OPUS-OpenSubtitles/v2018/tmx/de-en.tmx.gz
+
 Data must be loaded once and only once. Use the `load` or `loadtmx` commands. To reload data, delete `$HOME/.parcorp/data.sql`.
+
+# Prior work (and future work)
+
+* [Jorg Tiedemann](http://opus.nlpl.eu/) has done work both on algorithms to align phrases within subtitles to produce parallel corpora and maintains a number of parallel corpora that this tool can use.
+* The topic of [data driven language](https://en.wikipedia.org/wiki/Data-driven_learning) considers similar ideas.
