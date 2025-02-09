@@ -126,14 +126,14 @@ filename = os.path.join(data_dir, "data.sql")
 
 
 def load(args):
-    with open(args.en) as english_stream:
-        with open(args.de) as german_stream:
+    with open(args.en) as source_stream:
+        with open(args.de) as target_stream:
             os.unlink(filename)
             connection = sqlite3.connect(filename)
             create_table(connection)
 
-            for index, (english, german) in enumerate(
-                zip(english_stream, german_stream)
+            for index, (source, target) in enumerate(
+                zip(source_stream, target_stream)
             ):
                 if args.limit is not None and index > args.limit:
                     break
@@ -141,7 +141,7 @@ def load(args):
                 if index % 1000 == 0:
                     print(index)
 
-                sql_insert_pair(connection, english, german)
+                sql_insert_pair(connection, source, target)
 
             connection.commit()
 
@@ -238,17 +238,17 @@ def synonyms(args):
     cursor.execute(sql, sql_terms)
 
     counts = collections.Counter()
-    for german, english in cursor.fetchall():
-        german = strip_punct(german)
-        english = strip_punct(english)
-        german_words = get_words(german)
-        english_words = get_words(english)
+    for target, source in cursor.fetchall():
+        target = strip_punct(target)
+        source = strip_punct(source)
+        target_words = get_words(target)
+        source_words = get_words(source)
 
         counts.update(
             [
                 (g, e)
-                for g in german_words
-                for e in english_words
+                for g in target_words
+                for e in source_words
                 if e in args.target_csv
                 and (not args.source_csv or g in args.source_csv)
             ]
@@ -268,7 +268,7 @@ def get_words(s: str) -> List[str]:
     return [w.lower() for w in s.split()]
 
 
-def build_search_sql(german_terms, english_terms):
+def build_search_sql(target_terms, source_terms):
     def build_condition(field, terms):
         condition_template = " or ".join(["{} MATCH ?".format(field)] * len(terms))
         wrapped_condition = "({})".format(condition_template)
@@ -278,14 +278,14 @@ def build_search_sql(german_terms, english_terms):
         else:
             return []
 
-    german_query = build_condition("german", german_terms)
-    english_query = build_condition("english", english_terms)
+    target_query = build_condition("target", target_terms)
+    source_query = build_condition("source", source_terms)
 
-    sql = "select german, english from translation where {} order by max(length(german), length(english))".format(
-        " or ".join(german_query + english_query)
+    sql = "select target, source from translation where {} order by max(length(target), length(source))".format(
+        " or ".join(target_query + source_query)
     )
 
-    return sql, german_terms + english_terms
+    return sql, target_terms + source_terms
 
 
 def search(args):
@@ -298,16 +298,16 @@ def search(args):
         terms = ['"{}"'.format(t) for f in terms]
 
     if args.target:
-        german_terms = terms[:]
-        english_terms = []
+        target_terms = terms[:]
+        source_terms = []
     elif args.source:
-        german_terms = []
-        english_terms = terms[:]
+        target_terms = []
+        source_terms = terms[:]
     else:
-        german_terms = terms[:]
-        english_terms = terms[:]
+        target_terms = terms[:]
+        source_terms = terms[:]
 
-    sql, sql_terms = build_search_sql(german_terms, english_terms)
+    sql, sql_terms = build_search_sql(target_terms, source_terms)
 
     LOGGER.debug("Running sql {!r}".format(sql))
     cursor.execute(sql, sql_terms)
@@ -317,17 +317,17 @@ def search(args):
     else:
         words = collections.Counter()
         groups = collections.defaultdict(int)
-        for index, (german, english) in enumerate(cursor.fetchall()):
+        for index, (target, source) in enumerate(cursor.fetchall()):
             if args.skip is not None and index % args.skip != 0:
                 continue
 
             if args.max is not None:
-                if min(len(german.split(" ")), len(english.split(" "))) < args.max:
+                if min(len(target.split(" ")), len(source.split(" "))) < args.max:
                     continue
 
             if args.group:
                 containing_word, *_ = itertools.chain(
-                    [w for w in args.group if w in german or w in english], [None]
+                    [w for w in args.group if w in target or w in source], [None]
                 )
                 if containing_word:
                     groups[containing_word] += 1
@@ -337,19 +337,19 @@ def search(args):
 
             if args.words:
                 if args.only_source:
-                    words.update(english.split())
+                    words.update(source.split())
                 elif args.only_target:
-                    words.update(german.split())
+                    words.update(target.split())
                 else:
-                    words.update(english.split())
-                    words.update(german.split())
+                    words.update(source.split())
+                    words.update(target.split())
             else:
                 if args.only_source:
-                    print(f"{english}")
+                    print(f"{source}")
                 elif args.only_target:
-                    print(f"{german}")
+                    print(f"{target}")
                 else:
-                    print(f"{german} -> {english}")
+                    print(f"{target} -> {source}")
 
         if args.words:
             for word in sorted(words, key=words.get, reverse=True):
@@ -361,12 +361,16 @@ def search(args):
 
 def create_table(connection):
     connection.execute(
-        "create virtual table translation using fts3(english text, german text)"
+        "create virtual table translation using fts3(source text, target text)"
     )
 
 
-def sql_insert_pair(connection, english, german):
-    LOGGER.debug("Inserting %r, %r", english, german)
+def sql_insert_pair(connection, source, target):
+    LOGGER.debug("Inserting %r, %r", source, target)
     connection.execute(
-        "insert into translation(english, german) values (?, ?)", (english, german)
+        "insert into translation(source, target) values (?, ?)", (source, target)
     )
+
+
+if __name__ == '__main__':
+    main()
