@@ -164,6 +164,9 @@ def load_tmx(args):
         for event, element in lxml.etree.iterparse(
             stream, events=("start", "end")
         ):  # pylint: disable=c-extension-no-member
+
+            if index % 10000 == 0:
+                connection.commit()
             if event == "start":
                 if element.tag == "tu":
                     string1 = string2 = ""
@@ -199,6 +202,9 @@ def load_tmx(args):
                     continue
                 else:
                     raise ValueError(element.tag)
+
+            if event == "end":
+                element.clear()
 
     connection.commit()
 
